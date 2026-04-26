@@ -37,16 +37,6 @@ export default function Entry() {
 
         {view === 'options' && (
           <div className="flex flex-col gap-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
-            {/* If the user is already logged in or a guest, offer a quick button to jump to the app */}
-            {(user || isGuest) && (
-              <button
-                onClick={() => navigate('/app')}
-                className="w-full rounded-md bg-secondary px-4 py-2.5 text-sm font-medium text-secondary-foreground hover:bg-secondary/90 transition-colors mb-2"
-              >
-                Go to Workspace &rarr;
-              </button>
-            )}
-
             <button
               onClick={() => setView('signup')}
               className="w-full rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
