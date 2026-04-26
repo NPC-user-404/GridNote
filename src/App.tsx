@@ -10,22 +10,26 @@ import Editor from "./pages/Editor";
 import Entry from "./pages/Entry";
 import NotFound from "./pages/NotFound.tsx";
 import { Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const queryClient = new QueryClient();
 
 const AuthGuard = ({ children }: { children: React.ReactNode }) => {
   const { user, isGuest, isLoading } = useAuthStore();
+  const navigate = useNavigate();
 
-  if (isLoading) {
+  React.useEffect(() => {
+    if (!isLoading && !user && !isGuest) {
+      navigate("/");
+    }
+  }, [isLoading, user, isGuest, navigate]);
+
+  if (isLoading || (!user && !isGuest)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-canvas">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
-  }
-
-  if (!user && !isGuest) {
-    return <Entry />;
   }
 
   return <>{children}</>;
@@ -43,12 +47,15 @@ const App = () => {
         <Toaster />
       <Sonner />
       <BrowserRouter>
-        <AuthGuard>
-          <Routes>
-            <Route path="/" element={<Editor />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </AuthGuard>
+        <Routes>
+          <Route path="/" element={<Entry />} />
+          <Route path="/app" element={
+            <AuthGuard>
+              <Editor />
+            </AuthGuard>
+          } />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
       </BrowserRouter>
     </TooltipProvider>
     </ThemeProvider>

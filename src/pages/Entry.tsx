@@ -1,11 +1,32 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { AuthForm } from '@/components/auth/AuthForm';
-import { FileText, ArrowRight } from 'lucide-react';
+import { FileText, ArrowRight, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function Entry() {
-  const { continueAsGuest } = useAuthStore();
+  const { continueAsGuest, user, isGuest, isLoading } = useAuthStore();
   const [view, setView] = useState<'options' | 'login' | 'signup'>('options');
+  const navigate = useNavigate();
+
+  React.useEffect(() => {
+    if (!isLoading && (user || isGuest)) {
+      navigate('/app', { replace: true });
+    }
+  }, [user, isGuest, isLoading, navigate]);
+
+  const handleGuest = () => {
+    continueAsGuest();
+    navigate('/app');
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-canvas">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-canvas p-4">
@@ -45,7 +66,7 @@ export default function Entry() {
             </div>
 
             <button
-              onClick={continueAsGuest}
+              onClick={handleGuest}
               className="group flex w-full items-center justify-center gap-2 rounded-md border border-transparent bg-muted/50 px-4 py-2.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
             >
               Continue as Guest
@@ -65,6 +86,7 @@ export default function Entry() {
             <AuthForm 
               initialIsLogin={view === 'login'} 
               onToggleMode={(isLogin) => setView(isLogin ? 'login' : 'signup')} 
+              onSuccess={() => navigate('/app')}
             />
           </div>
         )}
