@@ -8,7 +8,7 @@ import { TodoCardComponent } from '@/components/cards/TodoCard';
 import { LinkCardComponent } from '@/components/cards/LinkCard';
 import { CodeCardComponent } from '@/components/cards/CodeCard';
 import { TableCardComponent } from '@/components/cards/TableCard';
-import { GripVertical, Trash2, Lock, Unlock, Palette, Pin, PinOff, Link, Group, Ungroup, X } from 'lucide-react';
+import { GripVertical, Trash2, Lock, Unlock, Palette, Pin, PinOff, Link, Group, Ungroup, X, ChevronUp, ChevronDown } from 'lucide-react';
 
 const CARD_COLORS = [
   { name: 'None', value: undefined, bg: 'transparent', border: 'hsl(var(--border))' },
@@ -127,6 +127,7 @@ function CardWrapper({ card, isEditMode, isLocked, isDimmed, isSelected }: { car
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [isMenuCollapsed, setIsMenuCollapsed] = useState(false);
   const dragStart = useRef<{ mouseX: number; mouseY: number; cardX: number; cardY: number } | null>(null);
   const resizeStart = useRef<{
     mouseX: number; mouseY: number;
@@ -324,13 +325,13 @@ function CardWrapper({ card, isEditMode, isLocked, isDimmed, isSelected }: { car
         </div>
       )}
 
-      {/* Selection outline */}
-      {isSelected && (
-        <div className="absolute -inset-1 z-0 rounded-xl border-2 border-primary/50 pointer-events-none" />
+      {/* Selection outline — only in edit mode, hidden in print/PDF */}
+      {isSelected && isEditMode && (
+        <div className="no-print absolute -inset-1 z-0 rounded-xl border-2 border-primary/50 pointer-events-none" />
       )}
 
       <div
-        className={`relative h-full rounded-lg border bg-card text-card-foreground overflow-hidden transition-all duration-200 ${card.stylePreset ? `style-${card.stylePreset}` : ''
+        className={`relative h-full rounded-lg border text-card-foreground transition-all duration-200 ${card.colorLabel ? '' : 'bg-card'} ${card.stylePreset ? `style-${card.stylePreset}` : ''
           } ${isDragging
             ? 'shadow-lg border-border'
             : isResizing || isSelected
@@ -341,84 +342,97 @@ function CardWrapper({ card, isEditMode, isLocked, isDimmed, isSelected }: { car
           } ${isLocked ? 'opacity-90' : ''}`}
         style={{
           fontFamily: card.fontFamily,
-          ...(colorStyles.bg ? { backgroundColor: colorStyles.bg } : {}),
+          backgroundColor: card.colorLabel ? colorStyles.bg : undefined,
           ...(colorStyles.borderLeft ? { borderLeft: colorStyles.borderLeft } : {}),
         }}
       >
         {/* Card Top Menu */}
         {isEditMode && !isLocked && (
-          <div className={`card-top-menu absolute top-0 left-0 right-0 flex h-7 items-center justify-between bg-muted/30 rounded-t-lg z-20 transition-opacity duration-150 ${showHandles ? 'opacity-100' : 'opacity-70'} px-1 overflow-hidden`}>
-            {/* Left Controls */}
+          <div className={`card-top-menu absolute top-0 left-0 right-0 flex h-7 items-center justify-between bg-muted/30 rounded-t-lg z-20 transition-opacity duration-150 ${showHandles ? 'opacity-100' : 'opacity-70'} px-1`}>
             <div className="flex items-center shrink-0">
-              <div
-                className="relative group/link"
-                onMouseEnter={() => setHoveredLinkSourceId(card.id)}
-                onMouseLeave={() => setHoveredLinkSourceId(null)}
-              >
-                <button
-                  onClick={(e) => { e.stopPropagation(); startLinkMode(linkModeSourceId === card.id ? null : card.id); }}
-                  className={`flex h-6 w-6 items-center justify-center transition-all duration-150 rounded-md ${linkModeSourceId === card.id ? 'bg-primary/20 text-primary' : card.links?.length ? 'text-primary' : 'text-muted-foreground/50 hover:text-primary hover:bg-muted/50'}`}
-                  title={linkModeSourceId === card.id ? 'Cancel link' : 'Link card'}
+              {!isMenuCollapsed && (
+                <div
+                  className="relative group/link"
+                  onMouseEnter={() => setHoveredLinkSourceId(card.id)}
+                  onMouseLeave={() => setHoveredLinkSourceId(null)}
                 >
-                  <Link className="h-3 w-3" />
-                </button>
-                {card.links && card.links.length > 0 && (
-                  <div className="absolute top-full left-0 pt-1 hidden group-hover/link:block z-50">
-                    <div className="flex flex-col gap-1 rounded-lg border border-border bg-popover p-2 shadow-lg text-xs w-48 animate-in fade-in zoom-in-95">
-                      <span className="text-muted-foreground font-semibold mb-1">Linked Cards:</span>
-                      {card.links.map(id => {
-                        const linkedCard = useDocumentStore.getState().document.pages.flatMap(p => p.cards).find(c => c.id === id);
-                        if (!linkedCard) return null;
-                        return (
-                          <div key={id} className="group/linkitem flex items-center gap-1">
-                            <button onClick={(e) => {
-                              e.stopPropagation();
-                              const el = document.getElementById(`card-wrapper-${id}`);
-                              if (el) {
-                                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                el.classList.add('ring-4', 'ring-primary', 'ring-offset-2', 'ring-offset-background');
-                                setTimeout(() => el.classList.remove('ring-4', 'ring-primary', 'ring-offset-2', 'ring-offset-background'), 1500);
-                              }
-                            }} className="flex-1 text-left truncate hover:bg-muted p-1.5 rounded-md transition-colors cursor-pointer text-foreground/80 hover:text-foreground font-medium">
-                              {('title' in linkedCard && linkedCard.title) ? linkedCard.title : (linkedCard.type.charAt(0).toUpperCase() + linkedCard.type.slice(1) + ' Card')}
-                            </button>
-                            <button onClick={(e) => { e.stopPropagation(); toggleLink(card.id, id); }} className="opacity-0 group-hover/linkitem:opacity-100 p-1 text-muted-foreground hover:text-destructive flex-shrink-0 transition-opacity" title="Remove link">
-                              <X className="h-3 w-3" />
-                            </button>
-                          </div>
-                        );
-                      })}
+                  <button
+                    onClick={(e) => { e.stopPropagation(); startLinkMode(linkModeSourceId === card.id ? null : card.id); }}
+                    className={`flex h-6 w-6 items-center justify-center transition-all duration-150 rounded-md ${linkModeSourceId === card.id ? 'bg-primary/20 text-primary' : card.links?.length ? 'text-primary' : 'text-muted-foreground/50 hover:text-primary hover:bg-muted/50'}`}
+                    title={linkModeSourceId === card.id ? 'Cancel link' : 'Link card'}
+                  >
+                    <Link className="h-3 w-3" />
+                  </button>
+                  {card.links && card.links.length > 0 && (
+                    <div className="absolute top-full left-0 pt-1 hidden group-hover/link:block z-50">
+                      <div className="flex flex-col gap-1 rounded-lg border border-border bg-popover p-2 shadow-lg text-xs w-48 animate-in fade-in zoom-in-95">
+                        <span className="text-muted-foreground font-semibold mb-1">Linked Cards:</span>
+                        {card.links.map(id => {
+                          const linkedCard = useDocumentStore.getState().document.pages.flatMap(p => p.cards).find(c => c.id === id);
+                          if (!linkedCard) return null;
+                          return (
+                            <div key={id} className="group/linkitem flex items-center gap-1">
+                              <button onClick={(e) => {
+                                e.stopPropagation();
+                                const el = document.getElementById(`card-wrapper-${id}`);
+                                if (el) {
+                                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                  el.classList.add('ring-4', 'ring-primary', 'ring-offset-2', 'ring-offset-background');
+                                  setTimeout(() => el.classList.remove('ring-4', 'ring-primary', 'ring-offset-2', 'ring-offset-background'), 1500);
+                                }
+                              }} className="flex-1 text-left truncate hover:bg-muted p-1.5 rounded-md transition-colors cursor-pointer text-foreground/80 hover:text-foreground font-medium">
+                                {('title' in linkedCard && linkedCard.title) ? linkedCard.title : (linkedCard.type.charAt(0).toUpperCase() + linkedCard.type.slice(1) + ' Card')}
+                              </button>
+                              <button onClick={(e) => { e.stopPropagation(); toggleLink(card.id, id); }} className="opacity-0 group-hover/linkitem:opacity-100 p-1 text-muted-foreground hover:text-destructive flex-shrink-0 transition-opacity" title="Remove link">
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Drag Handle */}
             <div
-              onMouseDown={canInteract ? handleMouseDown : undefined}
-              className={`flex-1 flex h-full items-center justify-center min-w-0 ${canInteract ? 'cursor-grab active:cursor-grabbing' : ''}`}
+              onMouseDown={canInteract && !isMenuCollapsed ? handleMouseDown : undefined}
+              className={`flex-1 flex h-full items-center justify-center min-w-0 ${canInteract && !isMenuCollapsed ? 'cursor-grab active:cursor-grabbing' : ''}`}
             >
-              {canInteract && <GripVertical className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />}
+              {canInteract && !isMenuCollapsed && <GripVertical className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />}
             </div>
 
             {/* Right Controls */}
             <div className="flex items-center shrink-0">
+              {!isMenuCollapsed && (
+                <>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); toggleCardPin(card.id); }}
+                    className={`flex h-6 w-6 items-center justify-center transition-all duration-150 rounded-md hover:bg-muted/50 ${card.isPinned ? 'text-primary' : 'text-muted-foreground/50 hover:text-primary'}`}
+                    title={card.isPinned ? 'Unpin card' : 'Pin card'}
+                  >
+                    {card.isPinned ? <Pin className="h-3 w-3" /> : <PinOff className="h-3 w-3" />}
+                  </button>
+                  <div className="scale-90 origin-center">
+                    <ColorPicker cardId={card.id} currentColor={card.colorLabel} />
+                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); deleteCard(card.id); }}
+                    className="card-delete-btn flex h-6 w-6 items-center justify-center text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-all duration-150 rounded-md"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </>
+              )}
+              {/* Collapse toggle — always visible */}
               <button
-                onClick={(e) => { e.stopPropagation(); toggleCardPin(card.id); }}
-                className={`flex h-6 w-6 items-center justify-center transition-all duration-150 rounded-md hover:bg-muted/50 ${card.isPinned ? 'text-primary' : 'text-muted-foreground/50 hover:text-primary'}`}
-                title={card.isPinned ? 'Unpin card' : 'Pin card'}
+                onClick={(e) => { e.stopPropagation(); setIsMenuCollapsed(!isMenuCollapsed); }}
+                className="flex h-6 w-6 items-center justify-center text-muted-foreground/50 hover:text-foreground transition-all duration-150 rounded-md hover:bg-muted/50"
+                title={isMenuCollapsed ? 'Show controls' : 'Hide controls'}
               >
-                {card.isPinned ? <Pin className="h-3 w-3" /> : <PinOff className="h-3 w-3" />}
-              </button>
-              <div className="scale-90 origin-center">
-                <ColorPicker cardId={card.id} currentColor={card.colorLabel} />
-              </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); deleteCard(card.id); }}
-                className="card-delete-btn flex h-6 w-6 items-center justify-center text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-all duration-150 rounded-md"
-              >
-                <Trash2 className="h-3 w-3" />
+                {isMenuCollapsed ? <ChevronDown className="h-3 w-3" /> : <ChevronUp className="h-3 w-3" />}
               </button>
             </div>
           </div>
@@ -431,7 +445,7 @@ function CardWrapper({ card, isEditMode, isLocked, isDimmed, isSelected }: { car
           </div>
         )}
 
-        <div className={`${isEditMode && !isLocked ? 'pt-7 p-3' : 'p-3'} h-full overflow-hidden`}>
+        <div className={`${isEditMode && !isLocked && !isMenuCollapsed ? 'pt-7 p-3' : 'p-3'} h-full overflow-hidden`}>
           {renderCard()}
         </div>
       </div>

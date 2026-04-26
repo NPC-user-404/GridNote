@@ -112,7 +112,7 @@ export const useDocumentStore = create<DocumentState & HistoryState>()(
         suggestedGroup: null,
 
         setSelectedCards: (cardIds) => set({ selectedCardIds: cardIds }),
-        setMode: (mode) => set({ mode }),
+        setMode: (mode) => set((s) => ({ mode, selectedCardIds: mode !== 'edit' ? [] : s.selectedCardIds })),
         startLinkMode: (cardId) => set({ linkModeSourceId: cardId }),
         setHoveredLinkSourceId: (cardId) => set({ hoveredLinkSourceId: cardId }),
         toggleLink: (sourceId, targetId) => set((s) => {
