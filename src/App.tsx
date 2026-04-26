@@ -7,9 +7,29 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import Editor from "./pages/Editor";
+import Entry from "./pages/Entry";
 import NotFound from "./pages/NotFound.tsx";
+import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
+
+const AuthGuard = ({ children }: { children: React.ReactNode }) => {
+  const { user, isGuest, isLoading } = useAuthStore();
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-canvas">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!user && !isGuest) {
+    return <Entry />;
+  }
+
+  return <>{children}</>;
+};
 
 const App = () => {
   React.useEffect(() => {
@@ -23,10 +43,12 @@ const App = () => {
         <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Editor />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthGuard>
+          <Routes>
+            <Route path="/" element={<Editor />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthGuard>
       </BrowserRouter>
     </TooltipProvider>
     </ThemeProvider>
