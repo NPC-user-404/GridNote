@@ -1,0 +1,171 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Outfit:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 20% 97%;
+    --foreground: 220 20% 14%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 14%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 14%;
+
+    --primary: 215 65% 46%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 40 15% 93%;
+    --secondary-foreground: 220 20% 14%;
+
+    --muted: 40 12% 92%;
+    --muted-foreground: 220 10% 46%;
+
+    --accent: 215 65% 46%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 86%;
+    --input: 220 13% 86%;
+    --ring: 215 65% 46%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 40 18% 95%;
+    --sidebar-foreground: 220 20% 14%;
+    --sidebar-primary: 215 65% 46%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 40 15% 90%;
+    --sidebar-accent-foreground: 220 20% 14%;
+    --sidebar-border: 220 13% 88%;
+    --sidebar-ring: 215 65% 46%;
+
+    --canvas: 220 10% 90%;
+    --page-shadow: 220 15% 70%;
+    --grid-dot: 220 10% 78%;
+  }
+
+  .dark {
+    --background: 220 20% 8%;
+    --foreground: 40 15% 92%;
+
+    --card: 220 18% 12%;
+    --card-foreground: 40 15% 92%;
+
+    --popover: 220 18% 12%;
+    --popover-foreground: 40 15% 92%;
+
+    --primary: 215 65% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 15% 16%;
+    --secondary-foreground: 40 15% 92%;
+
+    --muted: 220 12% 18%;
+    --muted-foreground: 220 10% 55%;
+
+    --accent: 215 65% 55%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 13% 22%;
+    --input: 220 13% 22%;
+    --ring: 215 65% 55%;
+
+    --sidebar-background: 220 18% 10%;
+    --sidebar-foreground: 40 15% 92%;
+    --sidebar-primary: 215 65% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 15% 16%;
+    --sidebar-accent-foreground: 40 15% 92%;
+    --sidebar-border: 220 13% 18%;
+    --sidebar-ring: 215 65% 55%;
+
+    --canvas: 220 15% 12%;
+    --page-shadow: 220 15% 6%;
+    --grid-dot: 220 10% 25%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+/* Card Style Presets */
+.style-soft-highlight {
+  @apply bg-primary/5 border-primary/30 shadow-md;
+}
+.dark .style-soft-highlight {
+  @apply bg-primary/10 border-primary/40;
+}
+.style-border-emphasis {
+  @apply border-2 border-primary shadow-md;
+}
+.dark .style-border-emphasis {
+  @apply border-2 border-primary shadow-lg;
+}
+
+/* Print styles for PDF export */
+@media print {
+  body {
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-page {
+    width: 210mm !important;
+    height: 297mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    page-break-after: always;
+    overflow: hidden;
+    position: relative;
+    background: white !important;
+  }
+
+  .print-page:last-child {
+    page-break-after: auto;
+  }
+
+  .grid-dots {
+    display: none !important;
+  }
+
+  .card-drag-handle {
+    display: none !important;
+  }
+
+  .card-delete-btn {
+    display: none !important;
+  }
+
+  .card-resize-handle {
+    display: none !important;
+  }
+}
+
+@page {
+  size: A4;
+  margin: 0;
+}
