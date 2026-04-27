@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { toast } from 'sonner';
 
 interface AuthFormProps {
   initialIsLogin?: boolean;
@@ -30,7 +31,10 @@ export function AuthForm({ initialIsLogin = true, onSuccess, onToggleMode, hideH
     try {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw error;
+        if (error) throw new Error("Invalid email or password");
+        
+        toast.success("Login successful");
+        if (onSuccess) onSuccess();
       } else {
         const { error } = await supabase.auth.signUp({ 
           email, 
@@ -40,8 +44,10 @@ export function AuthForm({ initialIsLogin = true, onSuccess, onToggleMode, hideH
           }
         });
         if (error) throw error;
+        
+        toast.success("Account created successfully. Please log in.");
+        handleToggle(true);
       }
-      if (onSuccess) onSuccess();
     } catch (err: any) {
       setError(err.message || 'An error occurred');
     } finally {

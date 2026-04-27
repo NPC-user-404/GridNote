@@ -64,13 +64,19 @@ export default function Profile() {
     
     setIsDeleting(true);
     try {
-      // Typically requires server-side function to fully delete auth user, 
-      // but we can delete the profile and log them out, 
-      // or if RPC delete_user is available:
-      // await supabase.rpc('delete_user');
-      
-      const { error } = await supabase.from('profiles').delete().eq('id', user?.id);
-      if (error) throw error;
+      // Delete user data
+      const { error: docsError } = await supabase.from('documents').delete().eq('user_id', user?.id);
+      if (docsError) throw docsError;
+
+      // Delete profile
+      const { error: profileError } = await supabase.from('profiles').delete().eq('id', user?.id);
+      if (profileError) throw profileError;
+
+      // Delete auth user (requires RPC delete_user which wraps Supabase Admin API)
+      const { error: authError } = await supabase.rpc('delete_user');
+      if (authError) {
+        console.warn('Note: Auth user deletion requires server-side setup or RPC.', authError);
+      }
       
       await logout();
       navigate('/');
