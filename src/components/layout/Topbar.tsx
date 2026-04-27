@@ -8,7 +8,8 @@ import { useFolderStore } from '@/store/folderStore';
 import { useAuthStore } from '@/store/authStore';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
+import { User } from 'lucide-react';
 
 export function Topbar() {
   const { document: doc, mode, setMode, setTitle, addPage, undo, redo, canUndo, canRedo, searchQuery, setSearchQuery, searchMode, setSearchMode } = useDocumentStore();
@@ -16,11 +17,28 @@ export function Topbar() {
   const { theme, setTheme } = useTheme();
   const { user, profile, logout } = useAuthStore();
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const profileMenuRef = React.useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+
+  React.useEffect(() => {
+    if (!showProfileMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target as Node)) {
+        setShowProfileMenu(false);
+      }
+    };
+    window.addEventListener('mousedown', handler);
+    return () => window.removeEventListener('mousedown', handler);
+  }, [showProfileMenu]);
 
   const handleExport = () => {
     saveNoteDocument(activeNoteId, doc);
     exportDocumentPdf(doc);
   };
+
+  const displayName = profile?.username || user?.email?.split('@')[0] || 'User';
+  const initial = displayName.charAt(0).toUpperCase();
 
   return (
     <header className="no-print flex h-12 items-center justify-between border-b border-border bg-background px-4">
@@ -140,19 +158,46 @@ export function Topbar() {
         <div className="h-5 w-px bg-border mx-1" />
 
         {user ? (
-          <div className="flex items-center gap-3">
-            <Link 
-              to="/profile"
-              className="text-[11px] font-medium text-foreground hover:text-primary transition-colors truncate max-w-[120px]"
-            >
-              {profile?.username || user.email}
-            </Link>
+          <div className="relative" ref={profileMenuRef}>
             <button
-              onClick={() => logout()}
-              className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted active:scale-[0.97] transition-all"
+              onClick={() => setShowProfileMenu(!showProfileMenu)}
+              className="flex items-center gap-2 rounded-md hover:bg-muted p-1 pr-2 transition-colors active:scale-[0.97]"
             >
-              Log Out
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <span className="text-[10px] font-bold">{initial}</span>
+              </div>
+              <span className="text-[11px] font-medium text-foreground truncate max-w-[100px]">
+                {displayName}
+              </span>
             </button>
+
+            {showProfileMenu && (
+              <div className="absolute right-0 top-full mt-1 w-48 rounded-lg border border-border bg-popover p-1 shadow-md animate-in fade-in zoom-in-95 z-50">
+                <div className="px-2 py-2 border-b border-border mb-1">
+                  <p className="text-xs font-semibold text-foreground truncate">{displayName}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowProfileMenu(false);
+                    navigate('/profile');
+                  }}
+                  className="w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-foreground hover:bg-muted transition-colors text-left"
+                >
+                  <User className="h-3.5 w-3.5" />
+                  Profile / Settings
+                </button>
+                <button
+                  onClick={() => {
+                    setShowProfileMenu(false);
+                    logout();
+                  }}
+                  className="w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-foreground hover:bg-muted transition-colors text-left"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+                  Log Out
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <button
