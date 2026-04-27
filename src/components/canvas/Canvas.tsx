@@ -119,6 +119,8 @@ function ColorPicker({ cardId, currentColor }: { cardId: string; currentColor?: 
   );
 }
 
+const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
 type ResizeDirection = 'e' | 'w' | 's' | 'se' | 'sw' | 'ne' | 'nw' | 'n';
 
 function CardWrapper({ card, isEditMode, isLocked, isDimmed, isSelected }: { card: Card; isEditMode: boolean; isLocked: boolean; isDimmed: boolean; isSelected: boolean }) {
@@ -135,13 +137,14 @@ function CardWrapper({ card, isEditMode, isLocked, isDimmed, isSelected }: { car
     cardW: number; cardH: number;
     dir: ResizeDirection;
   } | null>(null);
+  const pressTimer = useRef<number | null>(null);
 
   const canInteract = isEditMode && !isLocked && !card.isPinned;
   const showHandles = isEditMode && !isLocked && (isHovered || isDragging || isResizing || isSelected);
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
-      if (!canInteract) return;
+      if (!canInteract || isTouchDevice) return;
       e.preventDefault();
       e.stopPropagation();
       dragStart.current = {
@@ -156,9 +159,37 @@ function CardWrapper({ card, isEditMode, isLocked, isDimmed, isSelected }: { car
     [card.id, card.position, canInteract, setDragging]
   );
 
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      if (!canInteract || !isTouchDevice) return;
+      e.stopPropagation();
+      const touch = e.touches[0];
+      const clientX = touch.clientX;
+      const clientY = touch.clientY;
+      pressTimer.current = window.setTimeout(() => {
+        dragStart.current = {
+          mouseX: clientX,
+          mouseY: clientY,
+          cardX: card.position.x,
+          cardY: card.position.y,
+        };
+        setIsDragging(true);
+        setDragging(card.id);
+      }, 350);
+    },
+    [card.id, card.position, canInteract, setDragging]
+  );
+
+  const handleTouchEndOrMove = useCallback(() => {
+    if (pressTimer.current) {
+      clearTimeout(pressTimer.current);
+      pressTimer.current = null;
+    }
+  }, []);
+
   const handleResizeStart = useCallback(
     (e: React.MouseEvent, dir: ResizeDirection) => {
-      if (!canInteract) return;
+      if (!canInteract || isTouchDevice) return;
       e.preventDefault();
       e.stopPropagation();
       resizeStart.current = {
@@ -175,17 +206,43 @@ function CardWrapper({ card, isEditMode, isLocked, isDimmed, isSelected }: { car
     [card.position, card.size, canInteract]
   );
 
+  const handleResizeTouchStart = useCallback(
+    (e: React.TouchEvent, dir: ResizeDirection) => {
+      if (!canInteract || !isTouchDevice) return;
+      e.stopPropagation();
+      const touch = e.touches[0];
+      const clientX = touch.clientX;
+      const clientY = touch.clientY;
+      pressTimer.current = window.setTimeout(() => {
+        resizeStart.current = {
+          mouseX: clientX,
+          mouseY: clientY,
+          cardX: card.position.x,
+          cardY: card.position.y,
+          cardW: card.size.width,
+          cardH: card.size.height,
+          dir,
+        };
+        setIsResizing(true);
+      }, 350);
+    },
+    [card.position, card.size, canInteract]
+  );
+
   useEffect(() => {
     if (!isDragging) return;
-    const handleMouseMove = (e: MouseEvent) => {
+    const handleMove = (e: MouseEvent | TouchEvent) => {
       if (!dragStart.current) return;
-      const dx = e.clientX - dragStart.current.mouseX;
-      const dy = e.clientY - dragStart.current.mouseY;
+      if ('touches' in e && e.cancelable) e.preventDefault();
+      const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
+      const dx = clientX - dragStart.current.mouseX;
+      const dy = clientY - dragStart.current.mouseY;
       const newX = Math.max(0, Math.min(A4_WIDTH_PX - card.size.width, dragStart.current.cardX + dx));
       const newY = Math.max(0, Math.min(A4_HEIGHT_PX - 40, dragStart.current.cardY + dy));
       moveCard(card.id, { x: newX, y: newY });
     };
-    const handleMouseUp = () => {
+    const handleUp = () => {
       setIsDragging(false);
       setDragging(null);
       if (dragStart.current) {
@@ -213,21 +270,30 @@ function CardWrapper({ card, isEditMode, isLocked, isDimmed, isSelected }: { car
       }
       dragStart.current = null;
     };
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    window.addEventListener('touchmove', handleMove, { passive: false });
+    window.addEventListener('touchend', handleUp);
+    window.addEventListener('touchcancel', handleUp);
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('touchend', handleUp);
+      window.removeEventListener('touchcancel', handleUp);
     };
   }, [isDragging, card.id, card.type, card.position, card.size, card.pageId, card.groupId, moveCard, setDragging, setSuggestedGroup]);
 
   useEffect(() => {
     if (!isResizing) return;
-    const handleMouseMove = (e: MouseEvent) => {
+    const handleMove = (e: MouseEvent | TouchEvent) => {
       if (!resizeStart.current) return;
+      if ('touches' in e && e.cancelable) e.preventDefault();
+      const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : (e as MouseEvent).clientY;
       const r = resizeStart.current;
-      const dx = e.clientX - r.mouseX;
-      const dy = e.clientY - r.mouseY;
+      const dx = clientX - r.mouseX;
+      const dy = clientY - r.mouseY;
 
       let newW = r.cardW;
       let newH = r.cardH;
@@ -252,17 +318,31 @@ function CardWrapper({ card, isEditMode, isLocked, isDimmed, isSelected }: { car
       resizeCard(card.id, { width: newW, height: newH });
       moveCard(card.id, { x: newX, y: newY });
     };
-    const handleMouseUp = () => {
+    const handleUp = () => {
       setIsResizing(false);
       resizeStart.current = null;
     };
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
+    window.addEventListener('touchmove', handleMove, { passive: false });
+    window.addEventListener('touchend', handleUp);
+    window.addEventListener('touchcancel', handleUp);
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
+      window.removeEventListener('touchmove', handleMove);
+      window.removeEventListener('touchend', handleUp);
+      window.removeEventListener('touchcancel', handleUp);
     };
   }, [isResizing, card.id, resizeCard, moveCard]);
+
+  const getResizeProps = (dir: ResizeDirection) => ({
+    onMouseDown: (e: React.MouseEvent) => handleResizeStart(e, dir),
+    onTouchStart: (e: React.TouchEvent) => handleResizeTouchStart(e, dir),
+    onTouchEnd: handleTouchEndOrMove,
+    onTouchMove: handleTouchEndOrMove,
+    onTouchCancel: handleTouchEndOrMove,
+  });
 
   const renderCard = () => {
     switch (card.type) {
@@ -294,6 +374,7 @@ function CardWrapper({ card, isEditMode, isLocked, isDimmed, isSelected }: { car
         opacity: isDimmed ? 0 : 1,
         visibility: isDimmed ? 'hidden' : 'visible',
         pointerEvents: isDimmed ? 'none' : 'auto',
+        touchAction: 'manipulation',
       }}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => { if (!isDragging && !isResizing) setIsHovered(false); }}
@@ -399,6 +480,10 @@ function CardWrapper({ card, isEditMode, isLocked, isDimmed, isSelected }: { car
             {/* Drag Handle */}
             <div
               onMouseDown={canInteract && !isMenuCollapsed ? handleMouseDown : undefined}
+              onTouchStart={canInteract && !isMenuCollapsed ? handleTouchStart : undefined}
+              onTouchEnd={handleTouchEndOrMove}
+              onTouchMove={handleTouchEndOrMove}
+              onTouchCancel={handleTouchEndOrMove}
               className={`flex-1 flex h-full items-center justify-center min-w-0 ${canInteract && !isMenuCollapsed ? 'cursor-grab active:cursor-grabbing' : ''}`}
             >
               {canInteract && !isMenuCollapsed && <GripVertical className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />}
@@ -454,10 +539,10 @@ function CardWrapper({ card, isEditMode, isLocked, isDimmed, isSelected }: { car
       {showHandles && canInteract && (
         <>
           {/* Edge handles — invisible wide hit areas */}
-          <div onMouseDown={(e) => handleResizeStart(e, 'n')} className="absolute -top-1 left-3 right-3 h-2 cursor-n-resize z-30" />
-          <div onMouseDown={(e) => handleResizeStart(e, 's')} className="absolute -bottom-1 left-3 right-3 h-2 cursor-s-resize z-30" />
-          <div onMouseDown={(e) => handleResizeStart(e, 'e')} className="absolute top-3 -right-1 bottom-3 w-2 cursor-e-resize z-30" />
-          <div onMouseDown={(e) => handleResizeStart(e, 'w')} className="absolute top-3 -left-1 bottom-3 w-2 cursor-w-resize z-30" />
+          <div {...getResizeProps('n')} className="absolute -top-1 left-3 right-3 h-2 cursor-n-resize z-30" />
+          <div {...getResizeProps('s')} className="absolute -bottom-1 left-3 right-3 h-2 cursor-s-resize z-30" />
+          <div {...getResizeProps('e')} className="absolute top-3 -right-1 bottom-3 w-2 cursor-e-resize z-30" />
+          <div {...getResizeProps('w')} className="absolute top-3 -left-1 bottom-3 w-2 cursor-w-resize z-30" />
 
           {/* Edge midpoint indicators — hidden */}
           <div className="absolute top-[-1px] left-1/2 -translate-x-1/2 w-6 h-[2px] rounded-full bg-transparent pointer-events-none z-30" />
@@ -466,10 +551,10 @@ function CardWrapper({ card, isEditMode, isLocked, isDimmed, isSelected }: { car
           <div className="absolute right-[-1px] top-1/2 -translate-y-1/2 h-6 w-[2px] rounded-full bg-transparent pointer-events-none z-30" />
 
           {/* Corner handles — invisible, cursor preserved */}
-          <div onMouseDown={(e) => handleResizeStart(e, 'nw')} className="absolute -top-[3px] -left-[3px] w-[6px] h-[6px] bg-transparent border-none rounded-[1px] cursor-nw-resize z-40" />
-          <div onMouseDown={(e) => handleResizeStart(e, 'ne')} className="absolute -top-[3px] -right-[3px] w-[6px] h-[6px] bg-transparent border-none rounded-[1px] cursor-ne-resize z-40" />
-          <div onMouseDown={(e) => handleResizeStart(e, 'sw')} className="absolute -bottom-[3px] -left-[3px] w-[6px] h-[6px] bg-transparent border-none rounded-[1px] cursor-sw-resize z-40" />
-          <div onMouseDown={(e) => handleResizeStart(e, 'se')} className="absolute -bottom-[3px] -right-[3px] w-[6px] h-[6px] bg-transparent border-none rounded-[1px] cursor-se-resize z-40" />
+          <div {...getResizeProps('nw')} className="absolute -top-[3px] -left-[3px] w-[6px] h-[6px] bg-transparent border-none rounded-[1px] cursor-nw-resize z-40" />
+          <div {...getResizeProps('ne')} className="absolute -top-[3px] -right-[3px] w-[6px] h-[6px] bg-transparent border-none rounded-[1px] cursor-ne-resize z-40" />
+          <div {...getResizeProps('sw')} className="absolute -bottom-[3px] -left-[3px] w-[6px] h-[6px] bg-transparent border-none rounded-[1px] cursor-sw-resize z-40" />
+          <div {...getResizeProps('se')} className="absolute -bottom-[3px] -right-[3px] w-[6px] h-[6px] bg-transparent border-none rounded-[1px] cursor-se-resize z-40" />
         </>
       )}
     </div>
