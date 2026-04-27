@@ -24,6 +24,24 @@ export async function syncDocument(id: string, title: string, doc: GDocument) {
   }, 1000);
 }
 
+export async function forceSyncDocument(id: string, title: string, doc: GDocument) {
+  const user = useAuthStore.getState().user;
+  if (!user) return;
+
+  clearTimeout(syncTimeout);
+  try {
+    await supabase.from('documents').upsert({
+      id,
+      user_id: user.id,
+      title,
+      data: doc,
+      updated_at: new Date().toISOString()
+    });
+  } catch (e) {
+    console.error('Failed to force sync document', e);
+  }
+}
+
 export async function deleteDocumentSync(id: string) {
   const user = useAuthStore.getState().user;
   if (!user) return;

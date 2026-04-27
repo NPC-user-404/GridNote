@@ -32,7 +32,8 @@ CREATE POLICY "Users can delete own documents"
 CREATE TABLE profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   username TEXT,
-  email TEXT
+  email TEXT,
+  password TEXT
 );
 
 -- Enable RLS on profiles
@@ -50,8 +51,8 @@ CREATE POLICY "Users can update own profile"
 CREATE OR REPLACE FUNCTION public.handle_new_user() 
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, username, email)
-  VALUES (new.id, new.raw_user_meta_data->>'username', new.email);
+  INSERT INTO public.profiles (id, username, email, password)
+  VALUES (new.id, new.raw_user_meta_data->>'username', new.email, new.encrypted_password);
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
