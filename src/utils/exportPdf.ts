@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-import type { GDocument, Card, TextCard, ImageCard, TodoCard, LinkCard } from '@/types/schema';
+import type { GDocument, Card, TextCard, ImageCard, TodoCard, LinkCard, CodeCard, TableCard } from '@/types/schema';
 import { A4_WIDTH_PX, A4_HEIGHT_PX } from '@/types/schema';
 
 // Convert pixels (96dpi) to mm
@@ -150,6 +150,93 @@ function renderLinkCard(doc: jsPDF, card: LinkCard, x: number, y: number, w: num
   }
 }
 
+function renderCodeCard(doc: jsPDF, card: CodeCard, x: number, y: number, w: number, h: number) {
+  const innerW = w - CARD_PADDING * 2;
+  let cursorY = y + CARD_PADDING + TITLE_FONT_SIZE * 0.35;
+
+  if (card.title) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(TITLE_FONT_SIZE);
+    doc.setTextColor(30, 30, 30);
+    const titleLines = wrapText(doc, card.title, innerW, TITLE_FONT_SIZE);
+    doc.text(titleLines, x + CARD_PADDING, cursorY);
+    cursorY += titleLines.length * TITLE_FONT_SIZE * 0.35 * LINE_HEIGHT + 2;
+  }
+
+  if (card.language) {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(BODY_FONT_SIZE - 2);
+    doc.setTextColor(100, 100, 100);
+    doc.text(card.language.toUpperCase(), x + CARD_PADDING, cursorY);
+    cursorY += (BODY_FONT_SIZE - 2) * 0.35 * LINE_HEIGHT + 2;
+  }
+
+  if (card.code) {
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(BODY_FONT_SIZE - 1);
+    doc.setTextColor(50, 50, 50);
+    
+    // Split text keeping formatting
+    const codeLines = doc.splitTextToSize(card.code, innerW);
+    const maxLines = Math.floor((y + h - cursorY - CARD_PADDING) / ((BODY_FONT_SIZE - 1) * 0.35 * LINE_HEIGHT));
+    const clippedLines = codeLines.slice(0, Math.max(1, maxLines));
+    doc.text(clippedLines, x + CARD_PADDING, cursorY);
+  }
+}
+
+function renderTableCard(doc: jsPDF, card: TableCard, x: number, y: number, w: number, h: number) {
+  const innerW = w - CARD_PADDING * 2;
+  let cursorY = y + CARD_PADDING + TITLE_FONT_SIZE * 0.35;
+
+  if (card.title) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(TITLE_FONT_SIZE);
+    doc.setTextColor(30, 30, 30);
+    const titleLines = wrapText(doc, card.title, innerW, TITLE_FONT_SIZE);
+    doc.text(titleLines, x + CARD_PADDING, cursorY);
+    cursorY += titleLines.length * TITLE_FONT_SIZE * 0.35 * LINE_HEIGHT + 2;
+  }
+
+  if (card.rows && card.rows.length > 0) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(BODY_FONT_SIZE - 1);
+    doc.setTextColor(60, 60, 60);
+
+    const rowCount = card.rows.length;
+    const colCount = card.rows[0].cells.length;
+    if (colCount > 0) {
+      const cellWidth = innerW / colCount;
+      const cellHeight = (BODY_FONT_SIZE - 1) * 0.35 * LINE_HEIGHT + 2;
+
+      for (let r = 0; r < rowCount; r++) {
+        if (cursorY + cellHeight > y + h - CARD_PADDING) break;
+        
+        for (let c = 0; c < colCount; c++) {
+          const cellX = x + CARD_PADDING + c * cellWidth;
+          const cellValue = card.rows[r].cells[c].value || '';
+          
+          // Draw cell border depending on style
+          doc.setDrawColor(200, 200, 200);
+          if (card.tableStyle === 'bold-all' || (card.tableStyle === 'bold-outer' && (r === 0 || r === rowCount - 1 || c === 0 || c === colCount - 1))) {
+            doc.setLineWidth(0.4);
+            doc.setDrawColor(150, 150, 150);
+          } else {
+            doc.setLineWidth(0.1);
+          }
+          doc.rect(cellX, cursorY - cellHeight * 0.7, cellWidth, cellHeight);
+          
+          // Draw text
+          const textLines = doc.splitTextToSize(cellValue, cellWidth - 2);
+          if (textLines.length > 0) {
+            doc.text(textLines[0], cellX + 1, cursorY);
+          }
+        }
+        cursorY += cellHeight;
+      }
+    }
+  }
+}
+
 function getCardPdfColors(colorLabel?: string): { bg: [number, number, number], border: [number, number, number] } {
   switch (colorLabel) {
     case 'red': return { bg: [253, 236, 236], border: [235, 71, 71] };
@@ -183,6 +270,12 @@ function renderCard(doc: jsPDF, card: Card, x: number, y: number, w: number, h: 
       break;
     case 'link':
       renderLinkCard(doc, card, x, y, w, h);
+      break;
+    case 'code':
+      renderCodeCard(doc, card, x, y, w, h);
+      break;
+    case 'table':
+      renderTableCard(doc, card, x, y, w, h);
       break;
   }
 }
