@@ -27,3 +27,35 @@ CREATE POLICY "Users can update own documents"
 CREATE POLICY "Users can delete own documents" 
   ON documents FOR DELETE 
   USING (auth.uid() = user_id);
+
+-- Create profiles table
+CREATE TABLE profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  username TEXT,
+  email TEXT
+);
+
+-- Enable RLS on profiles
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view own profile" 
+  ON profiles FOR SELECT 
+  USING (auth.uid() = id);
+
+CREATE POLICY "Users can update own profile" 
+  ON profiles FOR UPDATE 
+  USING (auth.uid() = id);
+
+-- Trigger to automatically create profile on signup
+CREATE OR REPLACE FUNCTION public.handle_new_user() 
+RETURNS TRIGGER AS $$
+BEGIN
+  INSERT INTO public.profiles (id, username, email)
+  VALUES (new.id, new.raw_user_meta_data->>'username', new.email);
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();

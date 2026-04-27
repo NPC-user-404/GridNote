@@ -11,6 +11,7 @@ interface AuthFormProps {
 export function AuthForm({ initialIsLogin = true, onSuccess, onToggleMode, hideHeader = false }: AuthFormProps) {
   const [isLogin, setIsLogin] = useState(initialIsLogin);
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +32,13 @@ export function AuthForm({ initialIsLogin = true, onSuccess, onToggleMode, hideH
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       } else {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { error } = await supabase.auth.signUp({ 
+          email, 
+          password,
+          options: {
+            data: { username }
+          }
+        });
         if (error) throw error;
       }
       if (onSuccess) onSuccess();
@@ -68,6 +75,19 @@ export function AuthForm({ initialIsLogin = true, onSuccess, onToggleMode, hideH
             placeholder="you@example.com"
           />
         </div>
+        {!isLogin && (
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-foreground">Username</label>
+            <input
+              type="text"
+              required
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              className="rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-primary"
+              placeholder="Username"
+            />
+          </div>
+        )}
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-medium text-foreground">Password</label>
           <input

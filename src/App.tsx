@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import Editor from "./pages/Editor";
 import Entry from "./pages/Entry";
+import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound.tsx";
 import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -52,6 +53,11 @@ const App = () => {
           <Route path="/app" element={
             <AuthGuard>
               <Editor />
+            </AuthGuard>
+          } />
+          <Route path="/profile" element={
+            <AuthGuard>
+              <Profile />
             </AuthGuard>
           } />
           <Route path="*" element={<NotFound />} />

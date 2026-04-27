@@ -8,12 +8,13 @@ import { useFolderStore } from '@/store/folderStore';
 import { useAuthStore } from '@/store/authStore';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 export function Topbar() {
   const { document: doc, mode, setMode, setTitle, addPage, undo, redo, canUndo, canRedo, searchQuery, setSearchQuery, searchMode, setSearchMode } = useDocumentStore();
   const { activeNoteId, saveNoteDocument } = useFolderStore();
   const { theme, setTheme } = useTheme();
-  const { user, logout } = useAuthStore();
+  const { user, profile, logout } = useAuthStore();
   const [showAuthModal, setShowAuthModal] = useState(false);
 
   const handleExport = () => {
@@ -139,23 +140,26 @@ export function Topbar() {
         <div className="h-5 w-px bg-border mx-1" />
 
         {user ? (
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-medium text-muted-foreground truncate max-w-[120px]">
-              {user.email}
-            </span>
+          <div className="flex items-center gap-3">
+            <Link 
+              to="/profile"
+              className="text-[11px] font-medium text-foreground hover:text-primary transition-colors truncate max-w-[120px]"
+            >
+              {profile?.username || user.email}
+            </Link>
             <button
               onClick={() => logout()}
               className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted active:scale-[0.97] transition-all"
             >
-              Logout
+              Log Out
             </button>
           </div>
         ) : (
           <button
             onClick={() => setShowAuthModal(true)}
-            className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted active:scale-[0.97] transition-all"
+            className="flex items-center gap-1.5 rounded-md bg-foreground text-background px-3 py-1.5 text-xs font-medium hover:bg-foreground/90 active:scale-[0.97] transition-all"
           >
-            Login
+            Log In
           </button>
         )}
       </div>
