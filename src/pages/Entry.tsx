@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { AuthForm } from '@/components/auth/AuthForm';
-import { FileText, ArrowRight, Loader2 } from 'lucide-react';
+import { FileText, ArrowRight, Loader2, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function Entry() {
@@ -25,6 +25,15 @@ export default function Entry() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-canvas p-4">
       <div className="w-full max-w-sm rounded-xl border border-border bg-card p-8 shadow-sm">
+        {/* Back to Welcome */}
+        <button
+          onClick={() => navigate('/')}
+          className="mb-6 flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Back to Welcome
+        </button>
+
         <div className="flex flex-col items-center mb-8">
           <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary mb-4">
             <FileText className="h-6 w-6" />

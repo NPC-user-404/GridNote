@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/components/theme-provider";
 import Editor from "./pages/Editor";
 import Entry from "./pages/Entry";
+import Welcome from "./pages/Welcome";
 import Profile from "./pages/Profile";
 import NotFound from "./pages/NotFound.tsx";
 import { Loader2 } from "lucide-react";
@@ -21,7 +22,7 @@ const AuthGuard = ({ children }: { children: React.ReactNode }) => {
 
   React.useEffect(() => {
     if (!isLoading && !user && !isGuest) {
-      navigate("/");
+      navigate("/entry");
     }
   }, [isLoading, user, isGuest, navigate]);
 
@@ -49,7 +50,8 @@ const App = () => {
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Entry />} />
+          <Route path="/" element={<Welcome />} />
+          <Route path="/entry" element={<Entry />} />
           <Route path="/app" element={
             <AuthGuard>
               <Editor />
