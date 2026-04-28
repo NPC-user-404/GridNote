@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 import { temporal, type HistoryState } from './historyMiddleware';
-import type { GDocument, Card, Page, AppMode, Position, Size, SearchMode } from '@/types/schema';
+import type { GDocument, Card, Page, AppMode, Position, Size, SearchMode, SoftDeletedCard, CardSizePreset, CompositeLayout } from '@/types/schema';
 import { syncDocument } from '@/lib/sync';
 import { useFolderStore } from '@/store/folderStore';
 import {
@@ -12,6 +12,7 @@ import {
   MIN_CARD_HEIGHT,
   DEFAULT_CARD_WIDTH,
   DEFAULT_CARD_HEIGHT,
+  CARD_SIZE_PRESETS,
 } from '@/types/schema';
 
 const STORAGE_KEY = 'gridnote_document';
@@ -56,6 +57,8 @@ interface DocumentState {
   linkModeSourceId: string | null;
   hoveredLinkSourceId: string | null;
   suggestedGroup: string[] | null;
+  softDeletedCards: SoftDeletedCard[];
+  undoToastVisible: boolean;
 
   startLinkMode: (cardId: string | null) => void;
   setHoveredLinkSourceId: (cardId: string | null) => void;
@@ -83,7 +86,13 @@ interface DocumentState {
   moveCard: (cardId: string, position: Position) => void;
   resizeCard: (cardId: string, size: Size) => void;
   deleteCard: (cardId: string) => void;
+  softDeleteCard: (cardId: string) => void;
+  undoDelete: () => void;
+  permanentlyDeleteSoftDeleted: () => void;
   setCardColor: (cardId: string, color: string | undefined) => void;
+  setCardSizePreset: (cardId: string, preset: CardSizePreset) => void;
+  mergeCards: (cardIds: string[], layout: CompositeLayout) => void;
+  unmergeCard: (compositeCardId: string) => void;
   setDragging: (cardId: string | null) => void;
   setSearchQuery: (query: string) => void;
   setSearchMode: (mode: SearchMode) => void;
@@ -110,6 +119,8 @@ export const useDocumentStore = create<DocumentState & HistoryState>()(
         linkModeSourceId: null,
         hoveredLinkSourceId: null,
         suggestedGroup: null,
+        softDeletedCards: [],
+        undoToastVisible: false,
 
         setSelectedCards: (cardIds) => set({ selectedCardIds: cardIds }),
         setMode: (mode) => set((s) => ({ mode, selectedCardIds: mode !== 'edit' ? [] : s.selectedCardIds })),
@@ -458,6 +469,50 @@ export const useDocumentStore = create<DocumentState & HistoryState>()(
             selectedCardIds: s.selectedCardIds.filter(id => id !== cardId),
           })),
 
+        softDeleteCard: (cardId) =>
+          set((s) => {
+            let deletedCard: Card | undefined;
+            let foundPageId = '';
+            for (const p of s.document.pages) {
+              const c = p.cards.find((c) => c.id === cardId);
+              if (c) { deletedCard = c; foundPageId = p.id; break; }
+            }
+            if (!deletedCard) return s;
+            return {
+              document: {
+                ...s.document,
+                pages: s.document.pages.map((p) => ({
+                  ...p,
+                  cards: p.cards.filter((c) => c.id !== cardId),
+                })),
+                updatedAt: new Date().toISOString(),
+              },
+              selectedCardIds: s.selectedCardIds.filter(id => id !== cardId),
+              softDeletedCards: [...s.softDeletedCards, { card: deletedCard, pageId: foundPageId, deletedAt: Date.now() }],
+              undoToastVisible: true,
+            };
+          }),
+
+        undoDelete: () =>
+          set((s) => {
+            if (s.softDeletedCards.length === 0) return s;
+            const last = s.softDeletedCards[s.softDeletedCards.length - 1];
+            return {
+              document: {
+                ...s.document,
+                pages: s.document.pages.map((p) =>
+                  p.id === last.pageId ? { ...p, cards: [...p.cards, last.card] } : p
+                ),
+                updatedAt: new Date().toISOString(),
+              },
+              softDeletedCards: s.softDeletedCards.slice(0, -1),
+              undoToastVisible: s.softDeletedCards.length > 1,
+            };
+          }),
+
+        permanentlyDeleteSoftDeleted: () =>
+          set({ softDeletedCards: [], undoToastVisible: false }),
+
         setCardColor: (cardId, color) =>
           set((s) => ({
             document: {
@@ -471,6 +526,90 @@ export const useDocumentStore = create<DocumentState & HistoryState>()(
               updatedAt: new Date().toISOString(),
             },
           })),
+
+        setCardSizePreset: (cardId, preset) =>
+          set((s) => {
+            const dims = CARD_SIZE_PRESETS[preset];
+            return {
+              document: {
+                ...s.document,
+                pages: s.document.pages.map((p) => ({
+                  ...p,
+                  cards: p.cards.map((c) =>
+                    c.id === cardId
+                      ? { ...c, sizePreset: preset, size: { width: dims.width, height: dims.height } }
+                      : c
+                  ),
+                })),
+                updatedAt: new Date().toISOString(),
+              },
+            };
+          }),
+
+        mergeCards: (cardIds, layout) =>
+          set((s) => {
+            if (cardIds.length < 2) return s;
+            // Find all the text cards to merge
+            const allCards = s.document.pages.flatMap(p => p.cards);
+            const textCards = cardIds.map(id => allCards.find(c => c.id === id)).filter((c): c is Card => !!c && c.type === 'text');
+            if (textCards.length < 2) return s;
+
+            // Use position of first card as composite position
+            const minX = Math.min(...textCards.map(c => c.position.x));
+            const minY = Math.min(...textCards.map(c => c.position.y));
+            const maxX = Math.max(...textCards.map(c => c.position.x + c.size.width));
+            const maxY = Math.max(...textCards.map(c => c.position.y + c.size.height));
+            const pageId = textCards[0].pageId;
+
+            const compositeCard: Card = {
+              id: generateId(),
+              type: 'composite',
+              title: 'Merged Cards',
+              pageId,
+              position: { x: minX, y: minY },
+              size: {
+                width: layout === 'side-by-side' ? maxX - minX : Math.max(...textCards.map(c => c.size.width)),
+                height: layout === 'stacked' ? maxY - minY : Math.max(...textCards.map(c => c.size.height)),
+              },
+              childCardIds: cardIds,
+              layout,
+            };
+
+            // Hide original cards (keep them but mark as part of composite)
+            const pages = s.document.pages.map((p) => {
+              if (p.id !== pageId) return p;
+              const updatedCards = p.cards.map(c =>
+                cardIds.includes(c.id) ? { ...c, isDeleted: true } as Card : c
+              );
+              return { ...p, cards: [...updatedCards, compositeCard] };
+            });
+
+            return {
+              document: { ...s.document, pages, updatedAt: new Date().toISOString() },
+              selectedCardIds: [compositeCard.id],
+            };
+          }),
+
+        unmergeCard: (compositeCardId) =>
+          set((s) => {
+            const allCards = s.document.pages.flatMap(p => p.cards);
+            const composite = allCards.find(c => c.id === compositeCardId);
+            if (!composite || composite.type !== 'composite') return s;
+
+            const childIds = composite.childCardIds;
+            const pages = s.document.pages.map((p) => {
+              // Restore child cards, remove composite
+              const restoredCards = p.cards
+                .filter(c => c.id !== compositeCardId)
+                .map(c => childIds.includes(c.id) ? { ...c, isDeleted: undefined } as Card : c);
+              return { ...p, cards: restoredCards };
+            });
+
+            return {
+              document: { ...s.document, pages, updatedAt: new Date().toISOString() },
+              selectedCardIds: childIds,
+            };
+          }),
 
         setDragging: (cardId) => set({ draggingCardId: cardId }),
         setSearchQuery: (query) => set({ searchQuery: query }),
@@ -521,11 +660,11 @@ if (typeof window !== 'undefined') {
       }
 
       if (state.mode === 'edit') {
-        // Deletion
+        // Deletion (soft delete with undo)
         if (e.key === 'Delete' || e.key === 'Backspace') {
           if (state.selectedCardIds.length > 0) {
             e.preventDefault();
-            state.selectedCardIds.forEach(id => state.deleteCard(id));
+            state.selectedCardIds.forEach(id => state.softDeleteCard(id));
           }
         }
 

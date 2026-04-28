@@ -24,6 +24,8 @@ export interface TableRow {
   cells: TableCell[];
 }
 
+export type CardSizePreset = 'small' | 'medium' | 'large';
+
 interface CardBase {
   id: string;
   type: string;
@@ -36,6 +38,8 @@ interface CardBase {
   stylePreset?: 'default' | 'soft-highlight' | 'border-emphasis';
   groupId?: string;
   links?: string[];
+  sizePreset?: CardSizePreset;
+  isDeleted?: boolean;
 }
 
 export interface TextCard extends CardBase {
@@ -48,6 +52,7 @@ export interface ImageCard extends CardBase {
   type: 'image';
   title: string;
   imageData: string; // base64
+  description?: string;
 }
 
 export interface TodoCard extends CardBase {
@@ -77,7 +82,29 @@ export interface TableCard extends CardBase {
   tableStyle: 'default' | 'bold-outer' | 'bold-all';
 }
 
-export type Card = TextCard | ImageCard | TodoCard | LinkCard | CodeCard | TableCard;
+export type CompositeLayout = 'stacked' | 'side-by-side' | 'l-shape';
+
+export interface CompositeCard extends CardBase {
+  type: 'composite';
+  title: string;
+  childCardIds: string[];
+  layout: CompositeLayout;
+}
+
+export type Card = TextCard | ImageCard | TodoCard | LinkCard | CodeCard | TableCard | CompositeCard;
+
+export interface SoftDeletedCard {
+  card: Card;
+  pageId: string;
+  deletedAt: number;
+}
+
+// Card size preset dimensions
+export const CARD_SIZE_PRESETS: Record<CardSizePreset, { width: number; height: number }> = {
+  small: { width: 180, height: 90 },
+  medium: { width: 280, height: 120 },
+  large: { width: 420, height: 220 },
+};
 
 export interface Page {
   id: string;

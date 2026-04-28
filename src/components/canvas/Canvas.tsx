@@ -1,6 +1,6 @@
 import React, { useRef, useCallback, useState, useEffect } from 'react';
 import { useDocumentStore } from '@/store/documentStore';
-import type { Card, Position } from '@/types/schema';
+import type { Card, Position, CardSizePreset, CompositeLayout } from '@/types/schema';
 import { A4_WIDTH_PX, A4_HEIGHT_PX, GRID_SIZE, MIN_CARD_WIDTH, MIN_CARD_HEIGHT } from '@/types/schema';
 import { TextCardComponent } from '@/components/cards/TextCard';
 import { ImageCardComponent } from '@/components/cards/ImageCard';
@@ -8,7 +8,8 @@ import { TodoCardComponent } from '@/components/cards/TodoCard';
 import { LinkCardComponent } from '@/components/cards/LinkCard';
 import { CodeCardComponent } from '@/components/cards/CodeCard';
 import { TableCardComponent } from '@/components/cards/TableCard';
-import { GripVertical, Trash2, Lock, Unlock, Palette, Pin, PinOff, Link, Group, Ungroup, X, ChevronUp, ChevronDown } from 'lucide-react';
+import { CompositeCardComponent } from '@/components/cards/CompositeCard';
+import { GripVertical, Trash2, Lock, Unlock, Palette, Pin, PinOff, Link, Group, Ungroup, X, ChevronUp, ChevronDown, Maximize2, Minimize2, Square, Undo2, Merge, Columns2, Rows3, LayoutPanelLeft, Copy } from 'lucide-react';
 
 const CARD_COLORS = [
   { name: 'None', value: undefined, bg: 'transparent', border: 'hsl(var(--border))' },
@@ -119,12 +120,166 @@ function ColorPicker({ cardId, currentColor }: { cardId: string; currentColor?: 
   );
 }
 
+function SizePresetPicker({ cardId, currentPreset }: { cardId: string; currentPreset?: CardSizePreset }) {
+  const { setCardSizePreset } = useDocumentStore();
+  const [isOpen, setIsOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', handleClickOutside);
+    return () => window.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  const presets: { value: CardSizePreset; label: string; icon: React.ReactNode }[] = [
+    { value: 'small', label: 'S', icon: <Minimize2 className="h-3 w-3" /> },
+    { value: 'medium', label: 'M', icon: <Square className="h-3 w-3" /> },
+    { value: 'large', label: 'L', icon: <Maximize2 className="h-3 w-3" /> },
+  ];
+
+  return (
+    <div ref={pickerRef} className="relative">
+      <button
+        onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
+        className="flex h-7 w-7 items-center justify-center text-muted-foreground/50 hover:text-primary transition-all duration-150 rounded-md"
+        title="Resize card"
+      >
+        <Maximize2 className="h-3 w-3" />
+      </button>
+      {isOpen && (
+        <div
+          className="absolute top-8 right-0 z-50 flex gap-1 rounded-lg border border-border bg-popover p-1.5 shadow-lg animate-in fade-in-0 zoom-in-95"
+          style={{ minWidth: 'max-content' }}
+        >
+          {presets.map((p) => (
+            <button
+              key={p.value}
+              onClick={(e) => {
+                e.stopPropagation();
+                setCardSizePreset(cardId, p.value);
+                setIsOpen(false);
+              }}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[10px] font-semibold transition-all duration-150 ${
+                currentPreset === p.value
+                  ? 'bg-primary/15 text-primary ring-1 ring-primary/30'
+                  : 'hover:bg-muted text-muted-foreground hover:text-foreground'
+              }`}
+              title={p.value.charAt(0).toUpperCase() + p.value.slice(1)}
+            >
+              {p.icon}
+              {p.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UndoToast() {
+  const { undoToastVisible, softDeletedCards, undoDelete, permanentlyDeleteSoftDeleted } = useDocumentStore();
+  const timerRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (undoToastVisible && softDeletedCards.length > 0) {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = window.setTimeout(() => {
+        permanentlyDeleteSoftDeleted();
+      }, 5000);
+    }
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, [undoToastVisible, softDeletedCards.length, permanentlyDeleteSoftDeleted]);
+
+  if (!undoToastVisible || softDeletedCards.length === 0) return null;
+
+  return (
+    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-bottom-4 fade-in-0 duration-300">
+      <div className="flex items-center gap-3 rounded-xl border border-border bg-popover/95 backdrop-blur-md px-4 py-2.5 shadow-2xl">
+        <span className="text-sm text-foreground font-medium">
+          Card deleted
+        </span>
+        <button
+          onClick={() => {
+            if (timerRef.current) clearTimeout(timerRef.current);
+            undoDelete();
+          }}
+          className="flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+        >
+          <Undo2 className="h-3 w-3" />
+          Undo
+        </button>
+        <button
+          onClick={() => {
+            if (timerRef.current) clearTimeout(timerRef.current);
+            permanentlyDeleteSoftDeleted();
+          }}
+          className="text-muted-foreground hover:text-foreground transition-colors"
+          title="Dismiss"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MergeActionBar() {
+  const { selectedCardIds, mergeCards } = useDocumentStore();
+  const allCards = useDocumentStore((s) => s.document.pages.flatMap((p) => p.cards));
+
+  // Only show if 2+ text cards are selected
+  const selectedTextCards = selectedCardIds
+    .map((id) => allCards.find((c) => c.id === id))
+    .filter((c): c is Card => !!c && c.type === 'text' && !c.isDeleted);
+
+  if (selectedTextCards.length < 2) return null;
+
+  const layouts: { value: CompositeLayout; label: string; icon: React.ReactNode }[] = [
+    { value: 'stacked', label: 'Stack', icon: <Rows3 className="h-3.5 w-3.5" /> },
+    { value: 'side-by-side', label: 'Side by Side', icon: <Columns2 className="h-3.5 w-3.5" /> },
+    { value: 'l-shape', label: 'L-Shape', icon: <LayoutPanelLeft className="h-3.5 w-3.5" /> },
+  ];
+
+  return (
+    <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[100] animate-in slide-in-from-top-4 fade-in-0 duration-300">
+      <div className="flex items-center gap-2 rounded-xl border border-primary/20 bg-popover/95 backdrop-blur-md px-4 py-2.5 shadow-2xl">
+        <Merge className="h-4 w-4 text-primary" />
+        <span className="text-xs font-semibold text-foreground">
+          Merge {selectedTextCards.length} cards
+        </span>
+        <div className="w-px h-5 bg-border mx-1" />
+        {layouts.map((l) => (
+          <button
+            key={l.value}
+            onClick={(e) => {
+              e.stopPropagation();
+              mergeCards(selectedCardIds, l.value);
+            }}
+            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all duration-150 border border-transparent hover:border-primary/20"
+            title={l.label}
+          >
+            {l.icon}
+            {l.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
 type ResizeDirection = 'e' | 'w' | 's' | 'se' | 'sw' | 'ne' | 'nw' | 'n';
 
 function CardWrapper({ card, isEditMode, isLocked, isDimmed, isSelected }: { card: Card; isEditMode: boolean; isLocked: boolean; isDimmed: boolean; isSelected: boolean }) {
-  const { moveCard, resizeCard, deleteCard, setDragging, toggleCardSelection, toggleCardPin, setSuggestedGroup, suggestedGroup, createGroup, startLinkMode, linkModeSourceId, toggleLink, setHoveredLinkSourceId } = useDocumentStore();
+  const { moveCard, resizeCard, softDeleteCard, duplicateCards, setDragging, toggleCardSelection, toggleCardPin, setSuggestedGroup, suggestedGroup, createGroup, startLinkMode, linkModeSourceId, toggleLink, setHoveredLinkSourceId } = useDocumentStore();
   const colorStyles = getCardColorStyles(card.colorLabel);
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
@@ -358,6 +513,8 @@ function CardWrapper({ card, isEditMode, isLocked, isDimmed, isSelected }: { car
         return <CodeCardComponent card={card} isEditMode={isEditMode} />;
       case 'table':
         return <TableCardComponent card={card} isEditMode={isEditMode} />;
+      case 'composite':
+        return <CompositeCardComponent card={card} isEditMode={isEditMode} />;
     }
   };
 
@@ -501,10 +658,20 @@ function CardWrapper({ card, isEditMode, isLocked, isDimmed, isSelected }: { car
                     {card.isPinned ? <Pin className="h-3 w-3" /> : <PinOff className="h-3 w-3" />}
                   </button>
                   <div className="scale-90 origin-center">
+                    <SizePresetPicker cardId={card.id} currentPreset={card.sizePreset} />
+                  </div>
+                  <div className="scale-90 origin-center">
                     <ColorPicker cardId={card.id} currentColor={card.colorLabel} />
                   </div>
                   <button
-                    onClick={(e) => { e.stopPropagation(); deleteCard(card.id); }}
+                    onClick={(e) => { e.stopPropagation(); duplicateCards([card.id]); }}
+                    className="flex h-6 w-6 items-center justify-center text-muted-foreground/50 hover:text-primary hover:bg-muted/50 transition-all duration-150 rounded-md"
+                    title="Duplicate card"
+                  >
+                    <Copy className="h-3 w-3" />
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); softDeleteCard(card.id); }}
                     className="card-delete-btn flex h-6 w-6 items-center justify-center text-muted-foreground/50 hover:text-destructive hover:bg-destructive/10 transition-all duration-150 rounded-md"
                   >
                     <Trash2 className="h-3 w-3" />
@@ -641,7 +808,7 @@ function A4Page({
           />
         )}
 
-        {cards.map((card) => {
+        {cards.filter(c => !c.isDeleted).map((card) => {
           let isDimmed = false;
           if (query.length > 0) {
             if (searchMode === 'content') {
@@ -839,30 +1006,34 @@ export function Canvas() {
   }, [mode, doc.pages, addCard]);
 
   return (
-    <div
-      id="canvas-container"
-      className="flex-1 overflow-auto bg-canvas py-10 relative"
-      onMouseMove={handleMouseMove}
-      onClick={handleClick}
-      onDoubleClick={handleDoubleClick}
-    >
-      <div className="flex flex-col items-center px-4 relative min-h-full">
-        <LinkLinesOverlay />
-        {doc.pages.map((page) => (
-          <A4Page
-            key={page.id}
-            pageId={page.id}
-            cards={page.cards}
-            pageIndex={page.index}
-            isEditMode={mode === 'edit'}
-            isLocked={page.locked}
-            totalPages={doc.pages.length}
-            searchQuery={searchQuery}
-            searchMode={searchMode}
-            selectedCardIds={selectedCardIds}
-          />
-        ))}
+    <>
+      <div
+        id="canvas-container"
+        className="flex-1 overflow-auto bg-canvas py-10 relative"
+        onMouseMove={handleMouseMove}
+        onClick={handleClick}
+        onDoubleClick={handleDoubleClick}
+      >
+        <div className="flex flex-col items-center px-4 relative min-h-full">
+          <LinkLinesOverlay />
+          {doc.pages.map((page) => (
+            <A4Page
+              key={page.id}
+              pageId={page.id}
+              cards={page.cards}
+              pageIndex={page.index}
+              isEditMode={mode === 'edit'}
+              isLocked={page.locked}
+              totalPages={doc.pages.length}
+              searchQuery={searchQuery}
+              searchMode={searchMode}
+              selectedCardIds={selectedCardIds}
+            />
+          ))}
+        </div>
       </div>
-    </div>
+      {mode === 'edit' && <MergeActionBar />}
+      <UndoToast />
+    </>
   );
 }
