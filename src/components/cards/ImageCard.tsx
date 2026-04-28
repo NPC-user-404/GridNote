@@ -111,23 +111,6 @@ export function ImageCardComponent({ card, isEditMode }: { card: ImageCard; isEd
 
       <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
 
-      {/* Description field */}
-      {isEditMode ? (
-        <textarea
-          value={card.description || ''}
-          onChange={(e) => updateCard(card.id, { description: e.target.value })}
-          placeholder="Add a description..."
-          rows={2}
-          className="w-full shrink-0 resize-none bg-muted/20 rounded-md px-2 py-1.5 text-xs text-foreground outline-none placeholder:text-muted-foreground/60 leading-relaxed border border-transparent focus:border-border/50 transition-colors"
-        />
-      ) : (
-        card.description && (
-          <div className="shrink-0 border-t border-border/30 pt-1.5 mt-1">
-            <p className="text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed">{card.description}</p>
-          </div>
-        )
-      )}
-
       {isEditMode && card.imageData && (
         <button
           onClick={() => fileRef.current?.click()}
