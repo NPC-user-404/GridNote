@@ -31,7 +31,10 @@ export function AuthForm({ initialIsLogin = true, onSuccess, onToggleMode, hideH
     try {
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) throw new Error("Invalid email or password");
+        if (error) {
+          console.error("Login error:", error);
+          throw error;
+        }
         
         toast.success("Login successful");
         if (onSuccess) onSuccess();
@@ -43,12 +46,16 @@ export function AuthForm({ initialIsLogin = true, onSuccess, onToggleMode, hideH
             data: { username }
           }
         });
-        if (error) throw error;
+        if (error) {
+          console.error("Signup error:", error);
+          throw error;
+        }
         
         toast.success("Account created successfully. Please log in.");
         handleToggle(true);
       }
     } catch (err: any) {
+      console.error("Auth error caught:", err);
       setError(err.message || 'An error occurred');
     } finally {
       setLoading(false);
