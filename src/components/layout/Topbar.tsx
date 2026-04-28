@@ -187,9 +187,10 @@ export function Topbar() {
                   Profile / Settings
                 </button>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     setShowProfileMenu(false);
-                    logout();
+                    await logout();
+                    navigate('/');
                   }}
                   className="w-full flex items-center gap-2 rounded-md px-2 py-1.5 text-xs text-foreground hover:bg-muted transition-colors text-left"
                 >

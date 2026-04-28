@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useAuthStore } from '@/store/authStore';
 import { toast } from 'sonner';
 
 interface AuthFormProps {
@@ -16,6 +17,7 @@ export function AuthForm({ initialIsLogin = true, onSuccess, onToggleMode, hideH
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const refreshProfile = useAuthStore((s) => s.refreshProfile);
 
   const handleToggle = (newIsLogin: boolean) => {
     setIsLogin(newIsLogin);
@@ -35,6 +37,9 @@ export function AuthForm({ initialIsLogin = true, onSuccess, onToggleMode, hideH
           console.error("Login error:", error);
           throw error;
         }
+
+        // Ensure profile is loaded into state before navigating
+        await refreshProfile();
         
         toast.success("Login successful");
         if (onSuccess) onSuccess();

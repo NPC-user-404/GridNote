@@ -26,10 +26,14 @@ export default function Profile() {
     if (!isLoading && !user) {
       navigate('/');
     }
-    if (profile && !username) {
+  }, [user, isLoading, navigate]);
+
+  // Keep local username in sync whenever the profile changes
+  React.useEffect(() => {
+    if (profile?.username) {
       setUsername(profile.username);
     }
-  }, [user, isLoading, navigate, profile]);
+  }, [profile]);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,8 +58,8 @@ export default function Profile() {
       toast.error('Please enter your current password.');
       return;
     }
-    if (newPassword.length < 8) {
-      toast.error('New password must be at least 8 characters.');
+    if (newPassword.length < 6) {
+      toast.error('New password must be at least 6 characters.');
       return;
     }
     if (newPassword !== confirmPassword) {
@@ -244,7 +248,7 @@ export default function Profile() {
                     {showNewPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-                <p className="text-[11px] text-muted-foreground">Minimum 8 characters.</p>
+                <p className="text-[11px] text-muted-foreground">Minimum 6 characters.</p>
               </div>
 
               {/* Confirm New Password */}

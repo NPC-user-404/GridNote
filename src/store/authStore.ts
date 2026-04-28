@@ -19,6 +19,7 @@ interface AuthState {
   logout: () => Promise<void>;
   continueAsGuest: () => void;
   updateProfile: (updates: Partial<Profile>) => Promise<void>;
+  refreshProfile: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -79,6 +80,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       .single();
       
     if (error) throw error;
+    if (data) {
+      set({ profile: data });
+    }
+  },
+
+  refreshProfile: async () => {
+    const { user } = get();
+    if (!user) return;
+    const { data } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
     if (data) {
       set({ profile: data });
     }
